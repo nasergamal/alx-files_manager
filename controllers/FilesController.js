@@ -53,7 +53,7 @@ class FilesController {
         res.status(400).send('Parent is not a folder');
         return;
       }
-      parameters.parentId = ObjectID(parentId);
+      parameters.parentId = parentId;
     }
 
     if (isPublic !== undefined) {
@@ -75,11 +75,11 @@ class FilesController {
     await dbClient.db.collection('files').insertOne(parameters).then((result) => {
       res.status(201).send({
         id: result.insertedId,
-        userId: result.ops[0].userId,
+        userId: JSON.parse(id),
         name: parameters.name,
         type: parameters.type,
         isPublic: parameters.isPublic,
-        parentId,
+        parentId: parameters.parentId,
       });
     });
   }
