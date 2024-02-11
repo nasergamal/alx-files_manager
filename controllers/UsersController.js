@@ -1,9 +1,7 @@
-const crypto = require('crypto');
+const sha1 = require('sha1');
 const { ObjectID } = require('mongodb');
 const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
-
-const hash = crypto.createHash('sha1');
 
 class UserController {
   static async postNew(req, res) {
@@ -22,10 +20,10 @@ class UserController {
       res.status(400).send({ error: 'Already exist' });
       return;
     }
-    const pass = hash.digest(password);
+    const pass = sha1(password);
     try {
       users.insertOne({ email, password: pass }).then((result) => {
-        res.status(201).send({ id: result.insertedId, email });
+        res.status(201).send({ _id: result.insertedId, email });
       });
     } catch (error) {
       console.log(error);

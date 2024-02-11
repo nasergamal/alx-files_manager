@@ -4,7 +4,6 @@ const mime = require('mime-types');
 const { v4 } = require('uuid');
 const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
-const { userInfo } = require('os');
 
 class FilesController {
   static async postUpload(req, res) {
