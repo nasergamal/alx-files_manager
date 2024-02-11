@@ -1,7 +1,7 @@
-import AppController from '../controller/AppController';
-import AuthController from '../controller/AuthController';
-import FilesController from '../controller/FilesController';
-import UsersController from '../controller/UsersController';
+import AppController from '../controllers/AppController';
+import AuthController from '../controllers/AuthController';
+import FilesController from '../controllers/FilesController';
+import UsersController from '../controllers/UsersController';
 
 const { Router } = require('express');
 
