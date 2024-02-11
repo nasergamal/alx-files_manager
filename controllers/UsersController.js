@@ -23,7 +23,7 @@ class UserController {
     const pass = sha1(password);
     try {
       users.insertOne({ email, password: pass }).then((result) => {
-        res.status(201).send({ _id: result.insertedId, email });
+        res.status(201).send({ id: result.insertedId, email });
       });
     } catch (error) {
       console.log(error);

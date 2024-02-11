@@ -7,7 +7,7 @@ class AuthController {
   static async getConnect(req, res) {
     const credential = req.headers.authorization;
     const newcred = Buffer.from(credential.slice(6), 'base64').toString('ascii').split(':');
-    if (newcred.length < 2) {
+    if (newcred.length !== 2) {
       res.status(401).send({ error: 'Unauthorized' });
       return;
     }
@@ -20,8 +20,7 @@ class AuthController {
       return;
     }
     const token = v4();
-    await redisClient.set(`auth_${token}`, JSON.stringify(result._id), 86400);
-
+    await redisClient.set(`auth_${token}`, result._id.toString(), 86400);
     res.status(200).send({ token });
   }
 
@@ -33,7 +32,7 @@ class AuthController {
       return;
     }
     await redisClient.del(`auth_${token}`);
-    res.status(204).send();
+    res.status(204).send({});
   }
 }
 

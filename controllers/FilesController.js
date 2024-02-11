@@ -57,7 +57,7 @@ class FilesController {
     }
 
     if (isPublic !== undefined) {
-      parameters.isPublic = true;
+      parameters.isPublic = isPublic;
     }
     if (!fs.existsSync(path)) {
       fs.mkdirSync(path, { recursive: true });
@@ -76,10 +76,10 @@ class FilesController {
       res.status(201).send({
         id: result.insertedId,
         userId: result.ops[0].userId,
-        name: result.ops[0].name,
-        type: result.ops[0].type,
-        isPublic: result.ops[0].isPublic,
-        parentId: result.ops[0].parentId,
+        name: parameters.name,
+        type: parameters.type,
+        isPublic: parameters.isPublic,
+        parentId,
       });
     });
   }
