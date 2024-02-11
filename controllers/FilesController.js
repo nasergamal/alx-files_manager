@@ -6,6 +6,20 @@ const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
 
 class FilesController {
+  static async user(token) {
+    const id = await redisClient.get(`auth_${token}`);
+    if (id === null) {
+      return null;
+    }
+    const users = dbClient.db.collection('users');
+    const dbId = new ObjectID(JSON.parse(id));
+    const user = await users.findOne({ _id: dbId });
+    if (!user) {
+      return null;
+    }
+    return user;
+  }
+
   static async postUpload(req, res) {
     const {
       name,
@@ -14,15 +28,14 @@ class FilesController {
       isPublic,
       data,
     } = req.body;
-    const token = req.headers['x-token'];
-    const pathToken = v4();
-    const parameters = {};
-    const path = process.env.FOLDER_PATH ? process.env.FOLDER_PATH : '/tmp/files_manager';
-    const id = await redisClient.get(`auth_${token}`);
-    if (id === null) {
+    const user = await FilesController.user(req.headers['x-token']);
+    if (user === null) {
       res.status(401).send({ error: 'Unauthorized' });
       return;
     }
+    const pathToken = v4();
+    const parameters = {};
+    const path = process.env.FOLDER_PATH ? process.env.FOLDER_PATH : '/tmp/files_manager';
     if (name === undefined) {
       res.status(400).send('Missing name');
       return;
@@ -35,7 +48,7 @@ class FilesController {
       res.status(400).send('Missing data');
       return;
     }
-    parameters.userId = ObjectID(JSON.parse(id));
+    parameters.userId = ObjectID(user._id);
     parameters.name = name;
     parameters.type = type;
     parameters.isPublic = false;
@@ -53,20 +66,20 @@ class FilesController {
         res.status(400).send('Parent is not a folder');
         return;
       }
-      parameters.parentId = parentId;
+      parameters.parentId = ObjectID(parentId);
     }
 
     if (isPublic !== undefined) {
       parameters.isPublic = isPublic;
     }
-    if (!fs.existsSync(path)) {
-      fs.mkdirSync(path, { recursive: true });
-    }
-    const filePath = `${path}/${pathToken}`;
 
     if (['file', 'image'].includes(type)) {
+      try {
+        fs.mkdir(path, { recursive: true });
+      } catch (err) { /* */ }
+      const filePath = `${path}/${pathToken}`;
       const buf = Buffer.from(data, 'base64');
-      fs.writeFile(filePath, buf, (err) => {
+      fs.writeFile(filePath, buf, 'utf-8', (err) => {
         if (err) {
           console.log(err);
         }
@@ -75,7 +88,7 @@ class FilesController {
     await dbClient.db.collection('files').insertOne(parameters).then((result) => {
       res.status(201).send({
         id: result.insertedId,
-        userId: JSON.parse(id),
+        userId: user._id,
         name: parameters.name,
         type: parameters.type,
         isPublic: parameters.isPublic,
@@ -85,16 +98,14 @@ class FilesController {
   }
 
   static async getShow(req, res) {
-    const token = req.headers['x-token'];
-    let userId = await redisClient.get(`auth_${token}`);
-    if (userId === null) {
+    const user = await FilesController.user(req.headers['x-token']);
+    if (user === null) {
       res.status(401).send({ error: 'Unauthorized' });
       return;
     }
-    userId = ObjectID(JSON.parse(userId));
     const itemId = ObjectID(req.params.id);
     const result = await dbClient.db.collection('files').findOne(
-      { userId, _id: itemId },
+      { userId: user._id, _id: itemId },
       {
         projection:
           {
