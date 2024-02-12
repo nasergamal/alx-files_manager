@@ -9,7 +9,7 @@ const redisClient = require('../utils/redis');
 class FilesController {
   static async user(token) {
     const id = await redisClient.get(`auth_${token}`);
-    if (id === null) {
+    if (!id) {
       return null;
     }
     const users = dbClient.db.collection('users');
@@ -23,7 +23,7 @@ class FilesController {
 
   static async postUpload(req, res) {
     const user = await FilesController.user(req.headers['x-token']);
-    if (user === null) {
+    if (!user) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
@@ -34,16 +34,16 @@ class FilesController {
       isPublic,
       data,
     } = req.body;
-    if (name === undefined) {
-      res.status(400).json('Missing name');
+    if (!name) {
+      res.status(400).json({ error: 'Missing name' });
       return;
     }
-    if (type === undefined || !['folder', 'file', 'image'].includes(type)) {
-      res.status(400).json('Missing type');
+    if (!type || !['folder', 'file', 'image'].includes(type)) {
+      res.status(400).json({ error: 'Missing type' });
       return;
     }
-    if (data === undefined && type !== 'folder') {
-      res.status(400).json('Missing data');
+    if (!data && type !== 'folder') {
+      res.status(400).json({ error: 'Missing data' });
       return;
     }
     const parameters = {};
@@ -57,12 +57,12 @@ class FilesController {
     }
     if (parentId) {
       const parent = await dbClient.db.collection('files').findOne({ _id: ObjectID(parentId) });
-      if (parent === null) {
-        res.status(400).json('Parent not found');
+      if (!parent) {
+        res.status(400).json({ error: 'Parent not found' });
         return;
       }
       if (parent.type !== 'folder') {
-        res.status(400).json('Parent is not a folder');
+        res.status(400).json({ error: 'Parent is not a folder' });
         return;
       }
       parameters.parentId = parent._id;
@@ -98,28 +98,15 @@ class FilesController {
 
   static async getShow(req, res) {
     const user = await FilesController.user(req.headers['x-token']);
-    if (user === null) {
+    if (!user) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
     const itemId = ObjectID(req.params.id);
     const result = await dbClient.db.collection('files').findOne(
       { userId: user._id, _id: itemId },
-      { $sort: { _id: -1 } },
-      {
-        projection:
-          {
-            _id: 0,
-            id: '$_id',
-            userId: 1,
-            name: 1,
-            type: 1,
-            isPublic: 1,
-            parentId: 1,
-          },
-      },
     );
-    if (result === null) {
+    if (!result) {
       res.status(400).json({ error: 'Not found' });
       return;
     }
@@ -128,12 +115,12 @@ class FilesController {
 
   static async getIndex(req, res) {
     const user = await FilesController.user(req.headers['x-token']);
-    if (user === null) {
+    if (!user) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
     const { parentId } = req.query;
-    const page = req.query.page ? parseInt(req.query.page, 10) : 1;
+    const page = req.query.page ? parseInt(req.query.page, 10) : 0;
     const params = { userId: user._id };
     if (parentId) {
       params.parentId = ObjectID(req.query.parentId);
@@ -154,7 +141,7 @@ class FilesController {
       },
       {
         $facet: {
-          data: [{ $skip: parseInt(page - 1, 10) * 20 }, { $limit: 20 }],
+          data: [{ $skip: parseInt(page, 10) * 20 }, { $limit: 20 }],
         },
       },
     ]).toArray();
@@ -163,7 +150,7 @@ class FilesController {
 
   static async putPublish(req, res) {
     const user = await FilesController.user(req.headers['x-token']);
-    if (user === null) {
+    if (!user) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
@@ -172,7 +159,7 @@ class FilesController {
       { userId: user._id, _id: itemId },
       { $set: { isPublic: true } },
       {
-        returnDocument: 'after',
+        returnOriginal: 'false',
         projection:
           {
             id: '$_id',
@@ -185,7 +172,7 @@ class FilesController {
           },
       },
     );
-    if (file.lastErrorObject.updatedExisting === false) {
+    if (!file.lastErrorObject.updatedExisting) {
       res.status(404).json({ error: 'Not found' });
       return;
     }
@@ -194,7 +181,7 @@ class FilesController {
 
   static async putUnPublish(req, res) {
     const user = await FilesController.user(req.headers['x-token']);
-    if (user === null) {
+    if (!user) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
@@ -203,7 +190,7 @@ class FilesController {
       { userId: user._id, _id: itemId },
       { $set: { isPublic: false } },
       {
-        returnDocument: 'after',
+        returnOriginal: 'false',
         projection:
           {
             id: '$_id',
@@ -216,7 +203,7 @@ class FilesController {
           },
       },
     );
-    if (file.lastErrorObject.updatedExisting === false) {
+    if (!file.lastErrorObject.updatedExisting) {
       res.status(404).json({ error: 'Not found' });
       return;
     }
@@ -225,18 +212,14 @@ class FilesController {
 
   static async getFile(req, res) {
     const user = await FilesController.user(req.headers['x-token']);
-    if (user === null) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
     const itemId = ObjectID(req.params.id);
     const result = await dbClient.db.collection('files').findOne({ _id: itemId });
-    if (result === null) {
+    if (!result) {
       res.status(404).json({ error: 'Not found' });
       return;
     }
-    if (result.isPublic === false && (
-      user === null || result.userId.toString() !== user._id.toString())) {
+    if (!result.isPublic && (
+      !user || result.userId.toString() !== user._id.toString())) {
       res.status(404).json({ error: 'Not found' });
       return;
     }
@@ -245,10 +228,6 @@ class FilesController {
       return;
     }
     const type = mime.contentType(result.name);
-    if (!type) {
-      res.status(404).json({ error: 'Not found' });
-      return;
-    }
     fs.readFile(result.localPath, (err, data) => {
       if (err) {
         res.status(404).json({ error: 'Not found' });
