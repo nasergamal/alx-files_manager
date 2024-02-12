@@ -57,6 +57,9 @@ class FilesController {
     if (type !== 'folder') {
       parameters.localPath = `${path}/${pathToken}`;
     }
+    if (isPublic !== undefined) {
+      parameters.isPublic = isPublic;
+    }
     if (parentId) {
       const parent = await dbClient.db.collection('files').findOne({ _id: ObjectID(parentId) });
       if (parent === null) {
@@ -67,11 +70,7 @@ class FilesController {
         res.status(400).json('Parent is not a folder');
         return;
       }
-      parameters.parentId = ObjectID(parentId);
-    }
-
-    if (isPublic !== undefined) {
-      parameters.isPublic = isPublic;
+      parameters.parentId = parent._id;
     }
 
     if (['file', 'image'].includes(type)) {
