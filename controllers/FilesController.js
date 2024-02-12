@@ -1,7 +1,8 @@
+import { v4 as uuidv4 } from 'uuid';
+
 const { ObjectID } = require('mongodb');
 const fs = require('fs');
 const mime = require('mime-types');
-const { v4 } = require('uuid');
 const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
 
@@ -12,7 +13,7 @@ class FilesController {
       return null;
     }
     const users = dbClient.db.collection('users');
-    const dbId = new ObjectID(JSON.parse(id));
+    const dbId = new ObjectID(id);
     const user = await users.findOne({ _id: dbId });
     if (!user) {
       return null;
@@ -33,7 +34,7 @@ class FilesController {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const pathToken = v4();
+    const pathToken = uuidv4();
     const parameters = {};
     const path = process.env.FOLDER_PATH ? process.env.FOLDER_PATH : '/tmp/files_manager';
     if (name === undefined) {
@@ -51,8 +52,8 @@ class FilesController {
     parameters.userId = ObjectID(user._id);
     parameters.name = name;
     parameters.type = type;
-    parameters.parentId = 0;
     parameters.isPublic = false;
+    parameters.parentId = 0;
     if (type !== 'folder') {
       parameters.localPath = `${path}/${pathToken}`;
     }
@@ -127,15 +128,14 @@ class FilesController {
   }
 
   static async getIndex(req, res) {
-    const token = req.headers['x-token'];
-    const id = await redisClient.get(`auth_${token}`);
-    if (id === null) {
+    const user = await FilesController.user(req.headers['x-token']);
+    if (user === null) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
     const parentId = req.query.parentId ? ObjectID(req.query.parentId) : 0;
     const page = req.query.page ? parseInt(req.query.page, 10) : 1;
-    const params = { userId: ObjectID(JSON.parse(id)), parentId };
+    const params = { userId: user._id, parentId };
     const results = await dbClient.db.collection('files').aggregate([
       { $match: params },
       {
@@ -152,7 +152,7 @@ class FilesController {
       },
       {
         $facet: {
-          data: [{ $skip: (page - 1) * 20 }, { $limit: 20 }],
+          data: [{ $skip: parseInt(page - 1, 10) * 20 }, { $limit: 20 }],
         },
       },
     ]).toArray();

@@ -1,5 +1,6 @@
+import { v4 as uuidv4 } from 'uuid';
+
 const sha1 = require('sha1');
-const { v4 } = require('uuid');
 const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
 
@@ -19,7 +20,7 @@ class AuthController {
       res.status(401).send({ error: 'Unauthorized' });
       return;
     }
-    const token = v4();
+    const token = uuidv4();
     await redisClient.set(`auth_${token}`, result._id.toString(), 86400);
     res.status(200).send({ token });
   }
