@@ -110,7 +110,16 @@ class FilesController {
       res.status(400).json({ error: 'Not found' });
       return;
     }
-    res.status(200).json(result);
+    res.status(200).json(
+      {
+        id: result._id,
+        userId: result.userId,
+        name: result.name,
+        type: result.type,
+        isPublic: result.isPublic,
+        parentId: result.parentId,
+      },
+    );
   }
 
   static async getIndex(req, res) {
@@ -127,6 +136,7 @@ class FilesController {
     }
     const results = await dbClient.db.collection('files').aggregate([
       { $match: params },
+      { $sort: { _id: -1 } },
       {
         $project:
             {
@@ -158,19 +168,7 @@ class FilesController {
     const file = await dbClient.db.collection('files').findOneAndUpdate(
       { userId: user._id, _id: itemId },
       { $set: { isPublic: true } },
-      {
-        returnOriginal: 'false',
-        projection:
-          {
-            id: '$_id',
-            _id: 0,
-            userId: 1,
-            name: 1,
-            type: 1,
-            isPublic: 1,
-            parentId: 1,
-          },
-      },
+      { returnOriginal: false },
     );
     if (!file.lastErrorObject.updatedExisting) {
       res.status(404).json({ error: 'Not found' });
@@ -179,7 +177,7 @@ class FilesController {
     res.status(200).json(file.value);
   }
 
-  static async putUnPublish(req, res) {
+  static async putUnpublish(req, res) {
     const user = await FilesController.user(req.headers['x-token']);
     if (!user) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -189,19 +187,7 @@ class FilesController {
     const file = await dbClient.db.collection('files').findOneAndUpdate(
       { userId: user._id, _id: itemId },
       { $set: { isPublic: false } },
-      {
-        returnOriginal: 'false',
-        projection:
-          {
-            id: '$_id',
-            _id: 0,
-            userId: 1,
-            name: 1,
-            type: 1,
-            isPublic: 1,
-            parentId: 1,
-          },
-      },
+      { returnOriginal: false },
     );
     if (!file.lastErrorObject.updatedExisting) {
       res.status(404).json({ error: 'Not found' });
@@ -233,7 +219,6 @@ class FilesController {
         res.status(404).json({ error: 'Not found' });
         return;
       }
-      res.type(type);
       res.header('Content-Type', type).status(200).send(data);
     });
   }
