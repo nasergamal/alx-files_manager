@@ -1,10 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
 
+const Queue = require('bull');
 const { ObjectID } = require('mongodb');
 const fs = require('fs');
 const mime = require('mime-types');
 const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
+
+const fileQueue = new Queue('fileQueue', 'redis://127.0.0.1:6379');
 
 class FilesController {
   static async user(token) {
@@ -85,6 +88,9 @@ class FilesController {
       });
     }
     await dbClient.db.collection('files').insertOne(parameters).then((result) => {
+      if (type === 'image') {
+        fileQueue.add({ userId: user._id, fileId: result.insertedId });
+      }
       res.status(201).json({
         id: result.insertedId,
         userId: user._id,
@@ -213,8 +219,15 @@ class FilesController {
       res.status(400).json({ error: "A folder doesn't have content" });
       return;
     }
+    let path = result.localPath;
+    if (result.type === 'image') {
+      const { size } = req.query;
+      if (size) {
+        path = `${path}_${size}`;
+      }
+    }
     const type = mime.contentType(result.name);
-    fs.readFile(result.localPath, (err, data) => {
+    fs.readFile(path, (err, data) => {
       if (err) {
         res.status(404).json({ error: 'Not found' });
         return;
