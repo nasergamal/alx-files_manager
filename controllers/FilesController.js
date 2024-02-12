@@ -22,6 +22,11 @@ class FilesController {
   }
 
   static async postUpload(req, res) {
+    const user = await FilesController.user(req.headers['x-token']);
+    if (user === null) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
     const {
       name,
       type,
@@ -29,14 +34,6 @@ class FilesController {
       isPublic,
       data,
     } = req.body;
-    const user = await FilesController.user(req.headers['x-token']);
-    if (user === null) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-    const pathToken = uuidv4();
-    const parameters = {};
-    const path = process.env.FOLDER_PATH ? process.env.FOLDER_PATH : '/tmp/files_manager';
     if (name === undefined) {
       res.status(400).json('Missing name');
       return;
@@ -49,6 +46,7 @@ class FilesController {
       res.status(400).json('Missing data');
       return;
     }
+    const parameters = {};
     parameters.userId = ObjectID(user._id);
     parameters.name = name;
     parameters.type = type;
@@ -70,17 +68,17 @@ class FilesController {
       parameters.parentId = parent._id;
     }
 
+    const path = process.env.FOLDER_PATH ? process.env.FOLDER_PATH : '/tmp/files_manager';
     if (type !== 'folder') {
-      parameters.localPath = `${path}/${pathToken}`;
+      parameters.localPath = `${path}/${uuidv4()}`;
     }
 
     if (['file', 'image'].includes(type)) {
       try {
-        fs.mkdir(path, { recursive: true });
+        fs.mkdirSync(path);
       } catch (err) { /* */ }
-      const filePath = `${path}/${pathToken}`;
       const buf = Buffer.from(data, 'base64');
-      fs.writeFile(filePath, buf, 'utf-8', (err) => {
+      fs.writeFile(parameters.localPath, buf, 'utf-8', (err) => {
         if (err) {
           console.log(err);
         }
@@ -246,7 +244,7 @@ class FilesController {
       res.status(400).json({ error: "A folder doesn't have content" });
       return;
     }
-    const type = mime.lookup(result.name);
+    const type = mime.contentType(result.name);
     if (!type) {
       res.status(404).json({ error: 'Not found' });
       return;
@@ -257,7 +255,7 @@ class FilesController {
         return;
       }
       res.type(type);
-      res.status(200).send(data);
+      res.header('Content-Type', type).status(200).send(data);
     });
   }
 }
